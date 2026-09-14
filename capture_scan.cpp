@@ -1,5 +1,6 @@
 #include <iostream>
-#include <unistd.h> // Standard UNIX sleep replaces <thread>
+#include <thread>
+#include <chrono>
 #include <opencv2/opencv.hpp>
 
 // Include TaraXL SDK headers
@@ -41,7 +42,7 @@ int main() {
     for (int i = 0; i < num_frames; i++) {
         Mat leftImage, rightImage, grayDisp, depthImage;
         
-        // 3. Grab frames from the depth object (left, right, disparity, enableDisp, depth, enableDepth)
+        // 3. Grab frames from the depth object
         if (taraxlDepth->getMap(leftImage, rightImage, grayDisp, true, depthImage, true) == TARAXL_SUCCESS) {
             char rgb_filename[256], depth_filename[256];
             sprintf(rgb_filename, "plant_scan_data/rgb_%03d.png", i);
@@ -55,8 +56,8 @@ int main() {
             cout << "Failed to capture frame " << i + 1 << endl;
         }
         
-        // Wait 1 second (Requires no special compiler flags)
-        sleep(1);
+        // Native C++11 timing
+        std::this_thread::sleep_for(std::chrono::seconds(1));
     }
     
     selectedCam.disconnect();
