@@ -1,25 +1,37 @@
 #include <iostream>
-#include <thread>
-#include <chrono>
+#include <unistd.h> // Standard UNIX sleep replaces <thread>
 #include <opencv2/opencv.hpp>
 
+// Include TaraXL SDK headers
+#include "TaraXL.h"
 #include "TaraXLCam.h"
 #include "TaraXLDepth.h"
 
 using namespace std;
 using namespace cv;
-// Updated namespace based on compiler notes
 using namespace TaraXLSDK; 
 
 int main() {
-    TaraXLCam cam;
+    TaraXL taraxl;
+    TaraXLCam selectedCam;
+    TaraXLCamList taraxlCamList;
+    TaraXLDepth *taraxlDepth;
+
+    // 1. Enumerate and connect to the camera
+    taraxl.enumerateDevices(taraxlCamList);
+    if (taraxlCamList.size() == 0) {
+        cout << "No TaraXL camera found." << endl;
+        return -1;
+    }
     
-    if (cam.connect() != TARAXL_SUCCESS) {
-        cout << "Failed to connect to TaraXL camera." << endl;
+    selectedCam = taraxlCamList.at(0);
+    if (selectedCam.connect() != TARAXL_SUCCESS) {
+        cout << "Failed to connect to camera." << endl;
         return -1;
     }
 
-    cam.enableDepth(true);
+    // 2. Initialize the separate Depth module required by this SDK version
+    taraxlDepth = new TaraXLDepth(selectedCam);
     
     system("mkdir -p plant_scan_data");
     int num_frames = 60;
@@ -27,9 +39,10 @@ int main() {
     cout << "Starting 360-degree scan... Ensure turntable is rotating." << endl;
     
     for (int i = 0; i < num_frames; i++) {
-        Mat leftImage, rightImage, depthImage;
+        Mat leftImage, rightImage, grayDisp, depthImage;
         
-        if (cam.getMap(leftImage, rightImage, depthImage) == TARAXL_SUCCESS) {
+        // 3. Grab frames from the depth object (left, right, disparity, enableDisp, depth, enableDepth)
+        if (taraxlDepth->getMap(leftImage, rightImage, grayDisp, true, depthImage, true) == TARAXL_SUCCESS) {
             char rgb_filename[256], depth_filename[256];
             sprintf(rgb_filename, "plant_scan_data/rgb_%03d.png", i);
             sprintf(depth_filename, "plant_scan_data/depth_%03d.png", i);
@@ -42,11 +55,11 @@ int main() {
             cout << "Failed to capture frame " << i + 1 << endl;
         }
         
-        // Explicitly use std::this_thread and std::chrono
-        std::this_thread::sleep_for(std::chrono::seconds(1));
+        // Wait 1 second (Requires no special compiler flags)
+        sleep(1);
     }
     
-    cam.disconnect();
+    selectedCam.disconnect();
     cout << "Scan complete!" << endl;
     return 0;
 }
